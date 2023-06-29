@@ -1,6 +1,8 @@
-﻿using Newtonsoft.Json;
+﻿using System.Text;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Text;
+
+namespace GKE_Secret_Editor.Utils;
 
 public static class StringExtensions
 {
@@ -12,17 +14,16 @@ public static class StringExtensions
 
     public static string DecodeBase64(this string value)
     {
-        var valueBytes = System.Convert.FromBase64String(value);
+        var valueBytes = Convert.FromBase64String(value);
         return Encoding.UTF8.GetString(valueBytes);
     }
 
     public static bool IsValidJson(this string strInput)
     {
-        if (string.IsNullOrWhiteSpace(strInput)) { return false; }
+        if (string.IsNullOrWhiteSpace(strInput)) return false;
         strInput = strInput.Trim();
         if ((strInput.StartsWith("{") && strInput.EndsWith("}")) || //For object
             (strInput.StartsWith("[") && strInput.EndsWith("]"))) //For array
-        {
             try
             {
                 var obj = JToken.Parse(strInput);
@@ -39,10 +40,7 @@ public static class StringExtensions
                 Console.WriteLine(ex.ToString());
                 return false;
             }
-        }
-        else
-        {
-            return false;
-        }
+
+        return false;
     }
 }
