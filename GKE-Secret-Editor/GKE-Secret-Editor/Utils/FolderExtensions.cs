@@ -6,6 +6,17 @@ public static class FolderExtensions
     {
         var exists = Directory.Exists(path);
 
-        if (!exists) Directory.CreateDirectory(path);
+        if (!exists)
+        {
+            Directory.CreateDirectory(path);
+        }
+    }
+
+    public static void DeleteFolderIfExists(string folderPath)
+    {
+        if (Directory.Exists(folderPath))
+        {
+            Directory.Delete(folderPath, true);
+        }
     }
 }

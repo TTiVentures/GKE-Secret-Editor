@@ -22,7 +22,7 @@ public class CmdGoogleCloudConnection
 
     private void StartCmd()
     {
-        Cmd = new Process();
+        Cmd = new();
         Cmd.StartInfo.FileName = "cmd.exe";
         Cmd.StartInfo.RedirectStandardInput = true;
         Cmd.StartInfo.RedirectStandardOutput = true;
@@ -35,7 +35,10 @@ public class CmdGoogleCloudConnection
 
     private void FlushAndExecute()
     {
-        if (Cmd is null) throw new ApplicationException("Cmd is null");
+        if (Cmd is null)
+        {
+            throw new ApplicationException("Cmd is null");
+        }
 
         Cmd.StandardInput.Flush();
         Cmd.StandardInput.Close();
@@ -50,71 +53,109 @@ public class CmdGoogleCloudConnection
 
         // Check exit code error:
         if (exitCode != 0)
+        {
             _logger.LogError("An Error Occurred: \n{Error}", error);
+        }
 
         else
+        {
             _logger.LogInformation("Operation Completed Successfully");
+        }
     }
 
     public void GetOnCluster()
     {
-        if (Cmd is null) throw new ApplicationException("Cmd is null");
+        if (Cmd is null)
+        {
+            throw new ApplicationException("Cmd is null");
+        }
 
         Cmd.StandardInput.WriteLine(
             $"gcloud container clusters get-credentials {_properties.Cluster} --zone {_properties.Zone} --project {_properties.Project}");
     }
 
-    public string GetFromKubernetes(string outputFileName, string secretName)
+    public void GetFromKubernetes(string yamlOutputFilePath, string secretsDirectory, string secretName)
     {
         StartCmd();
 
         GetOnCluster();
 
-        var command = $"kubectl get secret {secretName} --namespace {_properties.Namespace} -o yaml > {outputFileName}";
-        if (Cmd is null) throw new ApplicationException("Cmd is null");
+        var command = $"kubectl get secret {secretName} --namespace {_properties.Namespace} -o yaml > {yamlOutputFilePath}";
+        if (Cmd is null)
+        {
+            throw new ApplicationException("Cmd is null");
+        }
+
         Cmd.StandardInput.WriteLine(command);
         FlushAndExecute();
 
-        var myConfig = YamlDeserializer.Deserializer.Deserialize<ExpandoObject>(File.ReadAllText(outputFileName));
+        var myConfig =
+            YamlDeserializer.Deserializer.Deserialize<ExpandoObject>(File.ReadAllText(yamlOutputFilePath));
 
         var data = ((dynamic)myConfig).data;
-        var secretBase64 = ((Dictionary<object, object>)data).First().Value.ToString();
-        return secretBase64.DecodeBase64();
+
+        foreach (var file in data)
+        {
+            var fileName = file.Key;
+            var fileContent = (string)file.Value.ToString()!;
+
+            var filePath = Path.Combine(secretsDirectory, fileName);
+            using (var sw = File.CreateText(filePath))
+            {
+                sw.WriteLine(fileContent.DecodeBase64());
+            }
+
+            Console.WriteLine($"File {fileName} downloaded.");
+        }
     }
 
-    public void WriteInKubernetes(string jsonEditedFile, string yamlEditedFile, string content)
+    public void WriteInKubernetes(string yamlOriginalFilePath, string yamlEditedOutputFilePath, string secretsDirectory)
     {
-        if (Cmd is null) throw new ApplicationException("Cmd is null");
-
-        if (!content.IsValidJson())
+        if (Cmd is null)
         {
-            Console.WriteLine("The Json is invalid");
-            return;
+            throw new ApplicationException("Cmd is null");
         }
 
         StartCmd();
 
-        var myConfig = YamlDeserializer.Deserializer.Deserialize<ExpandoObject>(File.ReadAllText(jsonEditedFile));
+        var originalYaml = YamlDeserializer.Deserializer.Deserialize<ExpandoObject>(File.ReadAllText(yamlOriginalFilePath));
 
-        var data = ((dynamic)myConfig).data;
+        var data = ((dynamic)originalYaml).data;
         var dict = (Dictionary<object, object>)data;
-        var dictValue = dict.First();
 
-        dict[dictValue.Key] = content.EncodeBase64();
+        foreach (var file in dict)
+        {
+            var fileName = file.Key.ToString()!;
+            var filePath = Path.Combine(secretsDirectory, fileName);
+            var fileContent = File.ReadAllText(filePath);
 
-        ((Dictionary<object, object>)((dynamic)myConfig).metadata).Remove("annotations");
-        ((Dictionary<object, object>)((dynamic)myConfig).metadata).Remove("creationTimestamp");
-        ((Dictionary<object, object>)((dynamic)myConfig).metadata).Remove("resourceVersion");
-        var yaml = YamlDeserializer.Serializer.Serialize(myConfig);
+            if (!File.Exists(filePath))
+            {
+                Console.WriteLine($"File {fileName} not found.");
+                return;
+            }
+            else
+            {
+                Console.WriteLine($"File {fileName}");
+            }
 
-        using (var sw = File.CreateText(yamlEditedFile))
+            dict[fileName] = fileContent.EncodeBase64();
+        }
+
+        // Remove metadata before uploading to GKE
+        ((Dictionary<object, object>)((dynamic)originalYaml).metadata).Remove("annotations");
+        ((Dictionary<object, object>)((dynamic)originalYaml).metadata).Remove("creationTimestamp");
+        ((Dictionary<object, object>)((dynamic)originalYaml).metadata).Remove("resourceVersion");
+        var yaml = YamlDeserializer.Serializer.Serialize(originalYaml);
+
+        using (var sw = File.CreateText(yamlEditedOutputFilePath))
         {
             sw.WriteLine(yaml);
         }
 
         GetOnCluster();
 
-        Cmd.StandardInput.WriteLine($"kubectl apply -f {yamlEditedFile}");
+        Cmd.StandardInput.WriteLine($"kubectl apply -f {yamlEditedOutputFilePath}");
 
         FlushAndExecute();
         Console.WriteLine("Secret saved.");

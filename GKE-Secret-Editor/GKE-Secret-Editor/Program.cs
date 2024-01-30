@@ -4,13 +4,18 @@ using GKE_Secret_Editor.Models;
 using GKE_Secret_Editor.Utils;
 using Microsoft.Extensions.Logging;
 
-const string yamlOutputPath = @"_data/yamls/output.yaml";
-const string yamlEditedOutputPath = @"_data/yamls/output-mod.yaml";
-const string jsonOutputPath = @"_data/output.json";
-const string propertiesPath = @"_data/properties.json";
+const string workDirectory = "_data";
+const string yamlsDirectory = workDirectory + "/yamls";
+const string secretsDirectory = workDirectory + "/secrets";
 
-FolderExtensions.CreateFolderIfDoesNotExists("_data");
-FolderExtensions.CreateFolderIfDoesNotExists("_data/yamls");
+const string yamlOutputFilePath = yamlsDirectory + "/output.yaml";
+const string yamlEditedOutputFilePath = yamlsDirectory + "/output-mod.yaml";
+
+const string propertiesPath = workDirectory + "/properties.json";
+
+FolderExtensions.CreateFolderIfDoesNotExists(workDirectory);
+FolderExtensions.CreateFolderIfDoesNotExists(yamlsDirectory);
+FolderExtensions.CreateFolderIfDoesNotExists(secretsDirectory);
 
 using var loggerFactory = LoggerFactory.Create(builder =>
 {
@@ -42,7 +47,7 @@ if (properties is null)
 }
 
 var gcConnection = new CmdGoogleCloudConnection(loggerFactory, properties);
-
+AppDomain.CurrentDomain.ProcessExit += BeforeExit;
 
 var command = "";
 while (command != "q")
@@ -61,17 +66,16 @@ while (command != "q")
                 Console.WriteLine("What secret do you want to edit?");
                 var secret = Console.ReadLine();
 
-                var secretJson = gcConnection.GetFromKubernetes(yamlOutputPath, secret);
-                using (var sw = File.CreateText(jsonOutputPath))
+                if (string.IsNullOrEmpty(secret))
                 {
-                    sw.WriteLine(secretJson);
+                    Console.WriteLine("Secret name is empty.");
+                    break;
                 }
 
+                gcConnection.GetFromKubernetes(yamlOutputFilePath, secretsDirectory, secret);
                 break;
             case "u":
-                var content = File.ReadAllText(jsonOutputPath);
-                gcConnection.WriteInKubernetes(yamlOutputPath, yamlEditedOutputPath, content);
-
+                gcConnection.WriteInKubernetes(yamlOutputFilePath, yamlEditedOutputFilePath, secretsDirectory);
                 break;
             case "q":
                 break;
@@ -84,4 +88,14 @@ while (command != "q")
     {
         logger.LogError(e.Message);
     }
+}
+
+void BeforeExit(object sender, EventArgs e)
+{
+    Console.WriteLine("Cleaning up...");
+    // Remove the two folders
+    // FolderExtensions.DeleteFolderIfExists(yamlsDirectory);
+    // FolderExtensions.DeleteFolderIfExists(secretsDirectory);
+
+    Console.WriteLine("Done.");
 }
