@@ -94,8 +94,8 @@ void BeforeExit(object sender, EventArgs e)
 {
     Console.WriteLine("Cleaning up...");
     // Remove the two folders
-    // FolderExtensions.DeleteFolderIfExists(yamlsDirectory);
-    // FolderExtensions.DeleteFolderIfExists(secretsDirectory);
+    FolderExtensions.DeleteFolderIfExists(yamlsDirectory);
+    FolderExtensions.DeleteFolderIfExists(secretsDirectory);
 
     Console.WriteLine("Done.");
 }

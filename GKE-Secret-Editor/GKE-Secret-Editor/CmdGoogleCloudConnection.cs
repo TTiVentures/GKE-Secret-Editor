@@ -119,38 +119,40 @@ public class CmdGoogleCloudConnection
         StartCmd();
 
         var originalYaml = YamlDeserializer.Deserializer.Deserialize<ExpandoObject>(File.ReadAllText(yamlOriginalFilePath));
+        var dataDictionary = (Dictionary<object, object>)((dynamic)originalYaml).data;
+        var directoryFiles = Directory.GetFiles(secretsDirectory).Select(Path.GetFileName).ToList();
 
-        var data = ((dynamic)originalYaml).data;
-        var dict = (Dictionary<object, object>)data;
-
-        foreach (var file in dict)
+        // Remove all removed files from the yaml 
+        foreach (var oldFile in dataDictionary.Keys)
         {
-            var fileName = file.Key.ToString()!;
-            var filePath = Path.Combine(secretsDirectory, fileName);
-            var fileContent = File.ReadAllText(filePath);
-
-            if (!File.Exists(filePath))
+            if (directoryFiles.Contains(oldFile))
             {
-                Console.WriteLine($"File {fileName} not found.");
-                return;
-            }
-            else
-            {
-                Console.WriteLine($"File {fileName}");
+                continue;
             }
 
-            dict[fileName] = fileContent.EncodeBase64();
+            dataDictionary.Remove(oldFile);
+            Console.WriteLine($"File {oldFile} removed.");
+        }
+
+        foreach (var newFile in directoryFiles)
+        {
+            var newFilePath = Path.Combine(secretsDirectory, newFile);
+            var newFileContent = File.ReadAllText(newFilePath);
+
+            dataDictionary[newFile] = newFileContent.EncodeBase64();
+
+            Console.WriteLine($"File {newFile} added.");
         }
 
         // Remove metadata before uploading to GKE
         ((Dictionary<object, object>)((dynamic)originalYaml).metadata).Remove("annotations");
         ((Dictionary<object, object>)((dynamic)originalYaml).metadata).Remove("creationTimestamp");
         ((Dictionary<object, object>)((dynamic)originalYaml).metadata).Remove("resourceVersion");
-        var yaml = YamlDeserializer.Serializer.Serialize(originalYaml);
+        var newEditedYaml = YamlDeserializer.Serializer.Serialize(originalYaml);
 
         using (var sw = File.CreateText(yamlEditedOutputFilePath))
         {
-            sw.WriteLine(yaml);
+            sw.WriteLine(newEditedYaml);
         }
 
         GetOnCluster();
