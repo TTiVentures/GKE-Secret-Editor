@@ -96,8 +96,8 @@ void ClearFolders()
 {
     Console.WriteLine("Cleaning up used folders...");
     // Remove the two folders
-    FolderExtensions.DeleteFolderIfExists(yamlsDirectory);
-    FolderExtensions.DeleteFolderIfExists(secretsDirectory);
+    FolderExtensions.DeleteFolderContentIfExists(yamlsDirectory);
+    FolderExtensions.DeleteFolderContentIfExists(secretsDirectory);
     Console.WriteLine("Done.");
 }
 

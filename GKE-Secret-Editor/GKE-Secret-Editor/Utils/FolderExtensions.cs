@@ -12,11 +12,14 @@ public static class FolderExtensions
         }
     }
 
-    public static void DeleteFolderIfExists(string folderPath)
+    public static void DeleteFolderContentIfExists(string folderPath)
     {
         if (Directory.Exists(folderPath))
         {
-            Directory.Delete(folderPath, true);
+            foreach (var file in Directory.GetFiles(folderPath))
+            {
+                File.Delete(file);
+            }
         }
     }
 }
