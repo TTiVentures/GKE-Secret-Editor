@@ -63,6 +63,8 @@ while (command != "q")
         switch (command)
         {
             case "d":
+                ClearFolders();
+                
                 Console.WriteLine("What secret do you want to edit?");
                 var secret = Console.ReadLine();
 
@@ -90,12 +92,16 @@ while (command != "q")
     }
 }
 
-void BeforeExit(object sender, EventArgs e)
+void ClearFolders()
 {
-    Console.WriteLine("Cleaning up...");
+    Console.WriteLine("Cleaning up used folders...");
     // Remove the two folders
     FolderExtensions.DeleteFolderIfExists(yamlsDirectory);
     FolderExtensions.DeleteFolderIfExists(secretsDirectory);
-
     Console.WriteLine("Done.");
+}
+
+void BeforeExit(object sender, EventArgs e)
+{
+    ClearFolders();
 }
